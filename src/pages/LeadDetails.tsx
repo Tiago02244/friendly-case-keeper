@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useStore } from '@/store/useStore';
 import {
   ChevronLeft, Phone, MessageCircle, Mail, Calendar,
   Clock, Plus, Send, CheckCircle2,
   History, User, DollarSign, Briefcase,
-  FileText, Paperclip, AlertCircle, ListTodo, Video
+  FileText, Paperclip, AlertCircle, ListTodo, Video, X, ChevronDown
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -31,6 +31,7 @@ export function LeadDetails() {
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isAdSelectorOpen, setIsAdSelectorOpen] = useState(false);
+  const [isAllLogsOpen, setIsAllLogsOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'history' | 'documents' | 'tasks'>('history');
 
@@ -65,6 +66,12 @@ export function LeadDetails() {
     );
   }
 
+  const sortedLogs = (lead.logs || []).slice().reverse();
+  const visibleLogs = sortedLogs.slice(0, 5);
+  const hasMoreLogs = sortedLogs.length > 5;
+  const sortedStages = [...kanbanStages].sort((a, b) => a.order - b.order);
+  const currentStage = kanbanStages.find(s => s.id === lead.status);
+
   return (
     <div className="p-10 max-w-7xl mx-auto space-y-10">
       <header className="flex items-center justify-between">
@@ -75,16 +82,20 @@ export function LeadDetails() {
           <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
           <span className="text-xs font-black uppercase tracking-widest">Voltar ao Pipeline</span>
         </button>
-        <div className="flex gap-4">
-          <select
-            value={lead.status}
-            onChange={(e) => updateLead(lead.id, { status: e.target.value })}
-            className="px-6 py-2.5 bg-card border border-border text-primary text-[10px] font-black rounded-lg uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-primary/50"
-          >
-            {kanbanStages.sort((a, b) => a.order - b.order).map(stage => (
-              <option key={stage.id} value={stage.id}>{stage.name}</option>
-            ))}
-          </select>
+        <div className="flex gap-3 items-center">
+          {/* Kanban stage selector with colored indicator */}
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full shadow-lg" style={{ backgroundColor: currentStage?.color || '#D4AF37' }}></div>
+            <select
+              value={lead.status}
+              onChange={(e) => updateLead(lead.id, { status: e.target.value })}
+              className="px-6 py-2.5 bg-card border border-border text-primary text-[10px] font-black rounded-lg uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-primary/50"
+            >
+              {sortedStages.map(stage => (
+                <option key={stage.id} value={stage.id}>{stage.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </header>
 
@@ -98,8 +109,15 @@ export function LeadDetails() {
             <div className="text-primary-foreground">
               <h1 className="text-4xl font-serif font-bold tracking-tight">{lead.name}</h1>
               <div className="flex items-center gap-4 mt-2">
-                <span className="px-3 py-1 bg-background/10 rounded-full text-[10px] font-black uppercase tracking-widest border border-background/10">
-                  {lead.status.replace('_', ' ')}
+                <span
+                  className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border"
+                  style={{
+                    backgroundColor: `${currentStage?.color}20`,
+                    color: currentStage?.color,
+                    borderColor: `${currentStage?.color}40`
+                  }}
+                >
+                  {currentStage?.name || lead.status}
                 </span>
                 <span className="text-xs font-bold opacity-70">Registrado em {format(new Date(lead.createdAt), 'dd/MM/yyyy HH:mm')}</span>
               </div>
@@ -192,45 +210,15 @@ export function LeadDetails() {
                 {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
 
-              <div className="relative">
-                <button
-                  onClick={() => setIsAdSelectorOpen(!isAdSelectorOpen)}
-                  disabled={!lead.campaignId}
-                  className="w-full bg-background/40 border border-border rounded-lg px-2 py-1 text-xs text-foreground text-left flex items-center justify-between hover:border-gold-500/50 disabled:opacity-50"
-                >
-                  <span>{ad ? ad.name : 'Selecionar Criativo'}</span>
-                  <ChevronLeft className={cn("w-4 h-4 transition-transform", isAdSelectorOpen ? "rotate-90" : "-rotate-90")} />
-                </button>
-
-                {isAdSelectorOpen && (
-                  <div className="absolute z-50 mt-2 w-64 bg-card border border-border rounded-xl shadow-2xl p-2 grid grid-cols-2 gap-2 max-h-64 overflow-y-auto custom-scrollbar">
-                    {availableAds.map(a => (
-                      <button
-                        key={a.id}
-                        onClick={() => {
-                          updateLead(lead.id, { adId: a.id, adGroupId: a.adGroupId });
-                          setIsAdSelectorOpen(false);
-                        }}
-                        className={cn(
-                          "flex flex-col gap-1 p-1 rounded-lg border transition-all hover:border-gold-500/50",
-                          lead.adId === a.id ? "border-primary bg-accent" : "border-border bg-background/40"
-                        )}
-                      >
-                        <div className="aspect-video rounded overflow-hidden bg-background">
-                          {a.mediaType === 'video' ? (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Video className="w-4 h-4 text-primary" />
-                            </div>
-                          ) : (
-                            <img src={a.mediaUrl} alt={a.name} className="w-full h-full object-cover" />
-                          )}
-                        </div>
-                        <span className="text-[8px] font-bold text-muted-foreground truncate w-full text-center">{a.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {/* Creative selector button */}
+              <button
+                onClick={() => setIsAdSelectorOpen(true)}
+                disabled={!lead.campaignId}
+                className="w-full bg-background/40 border border-border rounded-lg px-2 py-1 text-xs text-foreground text-left flex items-center justify-between hover:border-gold-500/50 disabled:opacity-50"
+              >
+                <span>{ad ? ad.name : 'Selecionar Criativo'}</span>
+                <ChevronDown className="w-4 h-4" />
+              </button>
 
               {ad && ad.mediaUrl && (
                 <div className="mt-2 rounded-xl overflow-hidden border border-border bg-background aspect-video relative">
@@ -454,7 +442,7 @@ export function LeadDetails() {
                 <div className="space-y-4">
                   <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-4">Log do Sistema</h3>
                   <div className="space-y-6">
-                    {(lead.logs || []).slice().reverse().map((log) => (
+                    {visibleLogs.map((log) => (
                       <div key={log.id} className="relative pl-6 border-l border-border">
                         <div className="absolute left-[-5px] top-1 w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_rgba(212,175,55,0.5)]"></div>
                         <p className="text-[10px] text-gold-500/60 font-bold uppercase tracking-widest">{log.timestamp}</p>
@@ -462,6 +450,14 @@ export function LeadDetails() {
                       </div>
                     ))}
                   </div>
+                  {hasMoreLogs && (
+                    <button
+                      onClick={() => setIsAllLogsOpen(true)}
+                      className="w-full py-3 text-primary text-[10px] font-black uppercase tracking-widest hover:underline border border-border rounded-xl hover:bg-accent transition-all"
+                    >
+                      Ver Todos os Registros ({sortedLogs.length})
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -685,6 +681,98 @@ export function LeadDetails() {
                 <button type="submit" className="px-8 py-3 bg-primary text-primary-foreground font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-gold-400 transition-all shadow-xl">Adicionar</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Creative Selector Popup */}
+      {isAdSelectorOpen && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-3xl p-8 w-full max-w-2xl shadow-2xl border border-border max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-serif font-bold gold-text-gradient">Selecionar Criativo</h2>
+              <button onClick={() => setIsAdSelectorOpen(false)} className="p-2 text-muted-foreground hover:text-primary rounded-lg">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+              {availableAds.length === 0 ? (
+                <div className="text-center py-20">
+                  <Video className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground italic">Nenhum criativo disponível para esta campanha.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {availableAds.map(a => {
+                    const adGroup = adGroups.find(ag => ag.id === a.adGroupId);
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() => {
+                          updateLead(lead.id, { adId: a.id, adGroupId: a.adGroupId });
+                          setIsAdSelectorOpen(false);
+                        }}
+                        className={cn(
+                          "flex flex-col gap-3 p-4 rounded-2xl border transition-all hover:border-gold-500/50 text-left",
+                          lead.adId === a.id ? "border-primary bg-accent ring-2 ring-primary/30" : "border-border bg-background/40"
+                        )}
+                      >
+                        <div className="aspect-video rounded-xl overflow-hidden border border-border bg-background">
+                          {a.mediaType === 'video' ? (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Video className="w-8 h-8 text-primary" />
+                            </div>
+                          ) : a.mediaUrl ? (
+                            <img src={a.mediaUrl} alt={a.name} className="w-full h-full object-contain bg-background" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                              <Briefcase className="w-8 h-8" />
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-foreground">{a.name}</p>
+                          {adGroup && (
+                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-1">
+                              Conjunto: {adGroup.name}
+                            </p>
+                          )}
+                        </div>
+                        {lead.adId === a.id && (
+                          <div className="flex items-center gap-1 text-emerald-500 text-[10px] font-black uppercase tracking-widest">
+                            <CheckCircle2 className="w-3 h-3" /> Selecionado
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* All Logs Popup */}
+      {isAllLogsOpen && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-3xl p-8 w-full max-w-2xl shadow-2xl border border-border max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-serif font-bold gold-text-gradient">Histórico Completo</h2>
+              <button onClick={() => setIsAllLogsOpen(false)} className="p-2 text-muted-foreground hover:text-primary rounded-lg">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-6">
+              {sortedLogs.map((log) => (
+                <div key={log.id} className="relative pl-6 border-l border-border">
+                  <div className="absolute left-[-5px] top-1 w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_rgba(212,175,55,0.5)]"></div>
+                  <p className="text-[10px] text-gold-500/60 font-bold uppercase tracking-widest">{log.timestamp}</p>
+                  <p className="text-sm text-foreground mt-1">{log.content}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
