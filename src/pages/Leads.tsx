@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useStore } from '@/store/useStore';
 import { Link } from 'react-router-dom';
 import { Search, Plus, Filter, LayoutGrid, List, ChevronRight, Phone, DollarSign } from 'lucide-react';
@@ -10,6 +10,8 @@ export function Leads() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
   const [selectedArea, setSelectedArea] = useState('');
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollIntervalRef = useRef<number | null>(null);
 
   const filteredLeads = (leads || []).filter(lead =>
     lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -40,11 +42,51 @@ export function Leads() {
   const onDrop = (e: React.DragEvent, status: string) => {
     const leadId = e.dataTransfer.getData('leadId');
     updateLead(leadId, { status });
+    stopAutoScroll();
   };
 
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    // Auto-scroll when dragging near edges
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const scrollZone = 100; // px from edge to trigger scroll
+    const scrollSpeed = 15;
+
+    if (e.clientX < rect.left + scrollZone) {
+      startAutoScroll(-scrollSpeed);
+    } else if (e.clientX > rect.right - scrollZone) {
+      startAutoScroll(scrollSpeed);
+    } else {
+      stopAutoScroll();
+    }
   };
+
+  const onDragEnd = () => {
+    stopAutoScroll();
+  };
+
+  const startAutoScroll = useCallback((speed: number) => {
+    if (scrollIntervalRef.current !== null) {
+      // If already scrolling in same direction, skip
+      return;
+    }
+    scrollIntervalRef.current = window.setInterval(() => {
+      const container = scrollContainerRef.current;
+      if (container) {
+        container.scrollLeft += speed;
+      }
+    }, 16);
+  }, []);
+
+  const stopAutoScroll = useCallback(() => {
+    if (scrollIntervalRef.current !== null) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
+  }, []);
 
   const sortedStages = [...kanbanStages].sort((a, b) => a.order - b.order);
 
@@ -102,7 +144,13 @@ export function Leads() {
       </div>
 
       {viewMode === 'kanban' ? (
-        <div className="flex gap-6 overflow-x-auto pb-6 custom-scrollbar min-h-[600px]">
+        <div
+          ref={scrollContainerRef}
+          className="flex gap-6 overflow-x-auto pb-6 custom-scrollbar min-h-[600px]"
+          onDragOver={onDragOver}
+          onDragEnd={onDragEnd}
+          onDragLeave={stopAutoScroll}
+        >
           {sortedStages.map(column => (
             <div
               key={column.id}
@@ -126,6 +174,7 @@ export function Leads() {
                     key={lead.id}
                     draggable
                     onDragStart={(e) => onDragStart(e, lead.id)}
+                    onDragEnd={onDragEnd}
                     className="bg-muted p-5 rounded-xl border border-border shadow-lg cursor-grab active:cursor-grabbing hover:border-gold-500/40 transition-all group"
                   >
                     <div className="flex justify-between items-start mb-3">

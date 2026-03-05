@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useStore } from '@/store/useStore';
-import { Plus, ChevronDown, ChevronRight, Image as ImageIcon, Video, Folder, LayoutGrid, X, Upload, Megaphone, Target, MousePointer2, Edit2 } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, Image as ImageIcon, Video, Folder, LayoutGrid, X, Upload, Megaphone, Target, MousePointer2, Edit2, CheckCircle2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export function Campaigns() {
   const { campaigns, adGroups, ads, areasOfLaw, services, addCampaign, updateCampaign, addAdGroup, updateAdGroup, addAd, updateAd } = useStore();
@@ -21,6 +22,7 @@ export function Campaigns() {
   const [newAdName, setNewAdName] = useState('');
   const [newAdMediaUrl, setNewAdMediaUrl] = useState('');
   const [newAdMediaType, setNewAdMediaType] = useState<'image' | 'video'>('image');
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -45,6 +47,26 @@ export function Campaigns() {
     setNewAdMediaUrl(ad.mediaUrl || '');
     setNewAdMediaType(ad.mediaType || 'image');
     setIsAdModalOpen(true);
+  };
+
+  const handleAdSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newAdName.trim()) {
+      if (editingAdId) {
+        updateAd(editingAdId, { name: newAdName.trim(), mediaUrl: newAdMediaUrl, mediaType: newAdMediaType });
+      } else {
+        addAd(selectedAdGroupIdForAd, newAdName.trim(), newAdMediaUrl, newAdMediaType);
+      }
+      // Show success animation then close
+      setShowSaveSuccess(true);
+      setTimeout(() => {
+        setShowSaveSuccess(false);
+        setIsAdModalOpen(false);
+        setNewAdName('');
+        setNewAdMediaUrl('');
+        setEditingAdId(null);
+      }, 800);
+    }
   };
 
   return (
@@ -310,10 +332,20 @@ export function Campaigns() {
         </div>
       )}
 
-      {/* Ad Modal */}
+      {/* Ad Modal with success animation */}
       {isAdModalOpen && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-3xl p-8 w-full max-w-md shadow-2xl border border-border">
+          <div className="bg-card rounded-3xl p-8 w-full max-w-md shadow-2xl border border-border relative overflow-hidden">
+            {/* Success overlay */}
+            {showSaveSuccess && (
+              <div className="absolute inset-0 z-50 bg-card flex flex-col items-center justify-center animate-fade-in">
+                <div className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center mb-4 animate-scale-in">
+                  <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+                </div>
+                <p className="text-lg font-serif font-bold text-foreground">Criativo Salvo!</p>
+              </div>
+            )}
+
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-2xl font-serif font-bold gold-text-gradient">{editingAdId ? 'Editar Criativo' : 'Novo Criativo'}</h2>
               <button onClick={() => { setIsAdModalOpen(false); setNewAdName(''); setNewAdMediaUrl(''); setEditingAdId(null); }} className="p-2 text-muted-foreground hover:text-primary rounded-lg">
@@ -321,20 +353,7 @@ export function Campaigns() {
               </button>
             </div>
 
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              if (newAdName.trim()) {
-                if (editingAdId) {
-                  updateAd(editingAdId, { name: newAdName.trim(), mediaUrl: newAdMediaUrl, mediaType: newAdMediaType });
-                } else {
-                  addAd(selectedAdGroupIdForAd, newAdName.trim(), newAdMediaUrl, newAdMediaType);
-                }
-                setIsAdModalOpen(false);
-                setNewAdName('');
-                setNewAdMediaUrl('');
-                setEditingAdId(null);
-              }
-            }} className="space-y-6">
+            <form onSubmit={handleAdSubmit} className="space-y-6">
               <div>
                 <label className="block text-[10px] font-black text-gold-500/60 uppercase tracking-widest mb-2">Nome do Criativo</label>
                 <input required value={newAdName} onChange={(e) => setNewAdName(e.target.value)} type="text" placeholder="Ex: AD 01 - Prova Social" className="w-full px-4 py-3 bg-background/40 border border-border rounded-xl text-foreground focus:ring-2 focus:ring-primary/50 focus:outline-none transition-all" />
@@ -343,10 +362,10 @@ export function Campaigns() {
               <div>
                 <label className="block text-[10px] font-black text-gold-500/60 uppercase tracking-widest mb-4">Formato da Mídia</label>
                 <div className="flex gap-4 mb-6">
-                  <button type="button" onClick={() => setNewAdMediaType('image')} className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-2 border text-[10px] font-black uppercase tracking-widest transition-all ${newAdMediaType === 'image' ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-gold-500/20' : 'bg-background/40 text-muted-foreground border-border hover:border-gold-500/30'}`}>
+                  <button type="button" onClick={() => setNewAdMediaType('image')} className={cn("flex-1 py-3 rounded-xl flex items-center justify-center gap-2 border text-[10px] font-black uppercase tracking-widest transition-all", newAdMediaType === 'image' ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-gold-500/20' : 'bg-background/40 text-muted-foreground border-border hover:border-gold-500/30')}>
                     <ImageIcon className="w-4 h-4" /> Imagem
                   </button>
-                  <button type="button" onClick={() => setNewAdMediaType('video')} className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-2 border text-[10px] font-black uppercase tracking-widest transition-all ${newAdMediaType === 'video' ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-gold-500/20' : 'bg-background/40 text-muted-foreground border-border hover:border-gold-500/30'}`}>
+                  <button type="button" onClick={() => setNewAdMediaType('video')} className={cn("flex-1 py-3 rounded-xl flex items-center justify-center gap-2 border text-[10px] font-black uppercase tracking-widest transition-all", newAdMediaType === 'video' ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-gold-500/20' : 'bg-background/40 text-muted-foreground border-border hover:border-gold-500/30')}>
                     <Video className="w-4 h-4" /> Vídeo
                   </button>
                 </div>
